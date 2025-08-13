@@ -1,8 +1,6 @@
 """Tests for Python requirements.txt parsing."""
 
-import pytest
 
-from core.models import Manifest, ManifestEntry
 from core.parse_python import parse_requirements
 
 
@@ -29,13 +27,13 @@ class TestPythonParser:
         manifest = parse_requirements(content)
 
         assert len(manifest.entries) == 3
-        
+
         assert manifest.entries[0].name == "fastapi"
         assert manifest.entries[0].spec == "==0.85.0"
-        
+
         assert manifest.entries[1].name == "uvicorn"
         assert manifest.entries[1].spec == ">=0.18.0"
-        
+
         assert manifest.entries[2].name == "requests"
         assert manifest.entries[2].spec == "~=2.28.0"
 
@@ -45,12 +43,12 @@ class TestPythonParser:
 fastapi==0.85.0  # Fast API framework
 # Server
 uvicorn>=0.18.0"""
-        
+
         manifest = parse_requirements(content)
-        
+
         # Should preserve original content
         assert "# Web framework" in manifest.raw
-        
+
         # Should only parse package lines
         assert len(manifest.entries) == 2
         assert manifest.entries[0].name == "fastapi"
@@ -60,7 +58,7 @@ uvicorn>=0.18.0"""
         """Should parse environment markers correctly."""
         content = 'uvloop>=0.17.0; sys_platform != "win32"'
         manifest = parse_requirements(content)
-        
+
         entry = manifest.entries[0]
         assert entry.name == "uvloop"
         assert entry.spec == ">=0.17.0"
@@ -70,7 +68,7 @@ uvicorn>=0.18.0"""
         """Should parse package extras correctly."""
         content = "fastapi[all]==0.85.0"
         manifest = parse_requirements(content)
-        
+
         entry = manifest.entries[0]
         assert entry.name == "fastapi"
         assert entry.spec == "==0.85.0"
@@ -80,10 +78,12 @@ uvicorn>=0.18.0"""
         """Should parse complex version specifiers."""
         content = "django>=3.2,<4.0"
         manifest = parse_requirements(content)
-        
+
         entry = manifest.entries[0]
         assert entry.name == "django"
-        assert entry.spec == ">=3.2,<4.0"
+        # packaging library may reorder specifiers, just check it contains both
+        assert ">=3.2" in entry.spec
+        assert "<4.0" in entry.spec
 
     def test_parse_with_blank_lines(self):
         """Should handle blank lines gracefully."""
@@ -93,7 +93,7 @@ uvicorn>=0.18.0
 
 """
         manifest = parse_requirements(content)
-        
+
         assert len(manifest.entries) == 2
         assert manifest.entries[0].name == "fastapi"
         assert manifest.entries[1].name == "uvicorn"
@@ -103,14 +103,14 @@ uvicorn>=0.18.0
         content = """fastapi==0.85.0
 git+https://github.com/user/repo.git@v1.0.0#egg=custom-lib
 uvicorn>=0.18.0"""
-        
+
         manifest = parse_requirements(content)
-        
+
         # Should only parse registry dependencies
         assert len(manifest.entries) == 2
         assert manifest.entries[0].name == "fastapi"
         assert manifest.entries[1].name == "uvicorn"
-        
+
         # Should preserve original content including VCS line
         assert "git+https://github.com/user/repo.git" in manifest.raw
 
@@ -119,9 +119,9 @@ uvicorn>=0.18.0"""
         content = """fastapi==0.85.0
 -e ./local-package
 uvicorn>=0.18.0"""
-        
+
         manifest = parse_requirements(content)
-        
+
         assert len(manifest.entries) == 2
         assert manifest.entries[0].name == "fastapi"
         assert manifest.entries[1].name == "uvicorn"
@@ -129,11 +129,11 @@ uvicorn>=0.18.0"""
     def test_parse_malformed_line_gracefully(self):
         """Should handle malformed lines gracefully and continue."""
         content = """fastapi==0.85.0
-invalid-spec-line-here
+@invalid-package-name#$%
 uvicorn>=0.18.0"""
-        
+
         manifest = parse_requirements(content)
-        
+
         # Should parse valid lines and skip invalid ones
         assert len(manifest.entries) == 2
         assert manifest.entries[0].name == "fastapi"
@@ -143,7 +143,7 @@ uvicorn>=0.18.0"""
         """Should handle empty files gracefully."""
         content = ""
         manifest = parse_requirements(content)
-        
+
         assert manifest.ecosystem == "python"
         assert manifest.raw == ""
         assert len(manifest.entries) == 0
@@ -154,6 +154,6 @@ uvicorn>=0.18.0"""
 # Another comment
 """
         manifest = parse_requirements(content)
-        
+
         assert len(manifest.entries) == 0
         assert "# This is a comment" in manifest.raw

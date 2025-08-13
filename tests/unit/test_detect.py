@@ -1,6 +1,5 @@
 """Tests for ecosystem detection."""
 
-import pytest
 
 from core.detect import identify
 
